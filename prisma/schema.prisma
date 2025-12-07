@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String         @id @default(uuid())
+  name             String
+  email            String         @unique
+  createdAt        DateTime       @default(now())
+  paidExpenses     Expense[]      @relation("PaidBy")
+  recordedExpenses Expense[]      @relation("RecordedBy")
+  expenseSplits    ExpenseSplit[]
+  groups           Group[]        @relation("UserGroups")
+}
+
+model Group {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  expenses  Expense[]
+  users     User[]    @relation("UserGroups")
+}
+
+model Expense {
+  id           String         @id @default(uuid())
+  description  String         @unique
+  amount       Decimal        @db.Decimal(10, 2)
+  createdAt    DateTime       @default(now())
+  groupId      String
+  recordedById String
+  paidById     String
+  group        Group          @relation(fields: [groupId], references: [id])
+  paidBy       User           @relation("PaidBy", fields: [paidById], references: [id])
+  recordedBy   User           @relation("RecordedBy", fields: [recordedById], references: [id])
+  splits       ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id         String  @id @default(uuid())
+  expenseId  String
+  userId     String
+  amountOwed Decimal @db.Decimal(10, 2)
+  expense    Expense @relation(fields: [expenseId], references: [id])
+  user       User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+}
