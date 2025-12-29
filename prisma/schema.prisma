@@ -1,52 +1,114 @@
-generator client {
-  provider = "prisma-client"
-  output   = "../generated/client"
-}
-
 datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id               String         @id @default(uuid())
-  name             String
-  email            String         @unique
-  createdAt        DateTime       @default(now())
-  paidExpenses     Expense[]      @relation("PaidBy")
-  recordedExpenses Expense[]      @relation("RecordedBy")
-  expenseSplits    ExpenseSplit[]
-  groups           Group[]        @relation("UserGroups")
+generator client {
+  provider = "prisma-client-js"
 }
 
+// NextAuth Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  
+  // App specific relations
+  groups        Group[]   @relation("GroupMembers")
+  expensesPaid  Expense[] @relation("Payer")
+  shares        ExpenseShare[]
+  paymentsSent  Payment[] @relation("Sender")
+  paymentsRec   Payment[] @relation("Receiver")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Domain Models
+
 model Group {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  createdAt DateTime  @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  
+  members   User[]   @relation("GroupMembers")
   expenses  Expense[]
-  users     User[]    @relation("UserGroups")
+  payments  Payment[]
 }
 
 model Expense {
-  id           String         @id @default(uuid())
-  description  String         @unique
-  amount       Decimal        @db.Decimal(10, 2)
-  createdAt    DateTime       @default(now())
-  groupId      String
-  recordedById String
-  paidById     String
-  group        Group          @relation(fields: [groupId], references: [id])
-  paidBy       User           @relation("PaidBy", fields: [paidById], references: [id])
-  recordedBy   User           @relation("RecordedBy", fields: [recordedById], references: [id])
-  splits       ExpenseSplit[]
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  
+  groupId     String?
+  group       Group?    @relation(fields: [groupId], references: [id])
+  
+  payerId     String
+  payer       User     @relation("Payer", fields: [payerId], references: [id])
+  
+  // To handle even, uneven, and exclusion logic, we store exact shares per user
+  shares      ExpenseShare[]
 }
 
-model ExpenseSplit {
-  id         String  @id @default(uuid())
-  expenseId  String
-  userId     String
-  amountOwed Decimal @db.Decimal(10, 2)
-  expense    Expense @relation(fields: [expenseId], references: [id])
-  user       User    @relation(fields: [userId], references: [id])
+model ExpenseShare {
+  id        String  @id @default(cuid())
+  amount    Float   // How much this specific user owes for this expense
+  
+  expenseId String
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+}
 
-  @@unique([expenseId, userId])
+model Payment {
+  id        String   @id @default(cuid())
+  amount    Float
+  date      DateTime @default(now())
+  
+  groupId   String?
+  group     Group?    @relation(fields: [groupId], references: [id])
+  
+  senderId  String
+  sender    User     @relation("Sender", fields: [senderId], references: [id])
+  
+  receiverId String
+  receiver   User    @relation("Receiver", fields: [receiverId], references: [id])
 }

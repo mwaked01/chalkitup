@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import { Inter } from "next/font/google";
+import "../styles/globals.css";
+import NextAuthSessionProvider from "@/components/session-provider-wrapper";
+import { AuthButton } from "@/components/auth-button";
+import Image from "next/image";
 import Link from "next/link";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "ChalkItUp",
-  description: "Settle up with the squad",
+  description: "Group expense tracking app.",
 };
 
 export default function RootLayout({
@@ -25,24 +19,31 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <header className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-sm z-50 border-b">
-          <nav aria-label="Main navigation" className="max-w-6xl mx-auto h-full flex items-center px-4">
-            <Link href="/" className="text-2xl font-bold px-4 py-2 block">
-              ChalkItUp
-            </Link>
-          </nav>
-        </header>
+      <body className={inter.className}>
+        <NextAuthSessionProvider>
+          {/* ------------------ HEADER WITH AUTH BUTTON ------------------ */}
+          <header className="shadow-md bg-[#222121] nav">
+            <nav className="max-w-7xl mx-auto p-4 flex justify-between items-center">
+              <Link href="/">
+                <div className="flex items-center space-x-2">
+                  <Image
+                    id="logo"
+                    src="/ChalkItUp_White_Logo.png"
+                    alt="ChalkItUp Logo"
+                    width={100}
+                    height={100}
+                    priority={true}
+                  />
+                </div>
+              </Link>
 
-        <main className="pt-16 pb-12">
-          {children}
-        </main>
+              <AuthButton />
+            </nav>
+          </header>
+          {/* --------------------------------------------------- */}
 
-        <footer className="fixed bottom-0 left-0 right-0 h-12 bg-white/90 backdrop-blur-sm z-50 border-t">
-          <div className="max-w-6xl mx-auto h-full flex items-center justify-center px-4 text-sm">
-            © {new Date().getFullYear()} ChalkItUp
-          </div>
-        </footer>
+          <main className="min-h-[90vh]">{children}</main>
+        </NextAuthSessionProvider>
       </body>
     </html>
   );

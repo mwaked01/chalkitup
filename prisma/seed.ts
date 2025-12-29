@@ -1,120 +1,107 @@
 import 'dotenv/config';
-import { PrismaClient } from '../generated/client/client.ts';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import { prisma } from '../lib/prisma.js'; 
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error('Missing DATABASE_URL environment variable.');
-  process.exit(1);
+async function clearDatabase() {
+  console.log("🧹 Clearing existing data...");
+
+  // Deletion must happen in dependency order to avoid foreign key constraints (even if CASCADE is set)
+  await prisma.expenseShare.deleteMany({});
+  await prisma.expense.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.group.deleteMany({});
+  
+  // Clear NextAuth models last
+  await prisma.verificationToken.deleteMany({});
+  await prisma.session.deleteMany({});
+  await prisma.account.deleteMany({});
+  await prisma.user.deleteMany({}); 
+
+  console.log("✅ Database cleared.");
 }
 
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+async function seedData() {
+  console.log("🌱 Starting seed data creation...");
+
+  // --- 1. Create Users ---
+  const alice = await prisma.user.create({
+    data: { name: 'Alice', email: 'alice@example.com', emailVerified: new Date(), image: 'https://i.pravatar.cc/150?img=1' },
+  });
+  const bob = await prisma.user.create({
+    data: { name: 'Bob', email: 'bob@example.com', emailVerified: new Date(), image: 'https://i.pravatar.cc/150?img=2' },
+  });
+  const charlie = await prisma.user.create({
+    data: { name: 'Charlie', email: 'charlie@example.com', emailVerified: new Date(), image: 'https://i.pravatar.cc/150?img=3' },
+  });
+
+  const allUsers = [alice, bob, charlie];
+  const userIds = allUsers.map(u => ({ id: u.id }));
+
+  console.log(`- Created ${allUsers.length} users: Alice, Bob, Charlie.`);
+
+  // --- 2. Create Group ---
+  const tripGroup = await prisma.group.create({
+    data: {
+      name: 'Trip to Mexico',
+      members: { connect: userIds },
+    },
+  });
+
+  console.log(`- Created group: ${tripGroup.name}`);
+  
+  // --- 3. Create Expense (Alice pays $300 for Hotel, split evenly 3 ways) ---
+  const totalAmount = 300.00;
+  const shareAmount = parseFloat((totalAmount / allUsers.length).toFixed(2)); // $100.00 each
+
+  const hotelExpense = await prisma.expense.create({
+    data: {
+      description: 'Hotel for 3 nights',
+      amount: totalAmount,
+      groupId: tripGroup.id,
+      payerId: alice.id,
+      shares: {
+        create: allUsers.map(user => ({
+          userId: user.id,
+          amount: shareAmount,
+        })),
+      },
+    },
+  });
+  
+  console.log(`- Created expense: "${hotelExpense.description}" (Total: $${hotelExpense.amount.toFixed(2)})`);
+  console.log(`  -> Alice is owed $${(totalAmount - shareAmount).toFixed(2)} from the others.`);
+
+
+  // --- 4. Create Payment (Bob settles half his debt to Alice) ---
+  const bobPayment = 50.00; // Bob owes $100, pays $50
+
+  await prisma.payment.create({
+    data: {
+      amount: bobPayment,
+      groupId: tripGroup.id,
+      senderId: bob.id,
+      receiverId: alice.id,
+    },
+  });
+  
+  console.log(`- Recorded payment: Bob sent $${bobPayment.toFixed(2)} to Alice.`);
+  console.log(`  -> Bob's remaining debt to Alice: $${(shareAmount - bobPayment).toFixed(2)}`);
+
+  console.log("✨ Seed completed successfully.");
+}
 
 
 async function main() {
-
-  // --- New seeding for User, Group, Expense, ExpenseSplit ---
-  // Create some example users, groups and expenses
   try {
-    // Create users (use upsert so the script is idempotent)
-    const alice = await prisma.user.upsert({
-      where: { email: 'alice@example.com' },
-      update: {},
-      create: { name: 'Alice Example', email: 'alice@example.com' },
-    });
-
-    const bob = await prisma.user.upsert({
-      where: { email: 'bob@example.com' },
-      update: {},
-      create: { name: 'Bob Example', email: 'bob@example.com' },
-    });
-
-    const carol = await prisma.user.upsert({
-      where: { email: 'carol@example.com' },
-      update: {},
-      create: { name: 'Carol Example', email: 'carol@example.com' },
-    });
-
-    console.log('Users upserted:', alice.email, bob.email, carol.email);
-
-    // Create a group and connect users
-    const roommates = await prisma.group.upsert({
-      where: { name: 'Roommates' },
-      update: {},
-      create: {
-        name: 'Roommates',
-        users: {
-          connect: [{ id: alice.id }, { id: bob.id }, { id: carol.id }],
-        },
-      },
-    });
-
-    console.log('Group upserted:', roommates.name);
-
-    // Create an expense with splits
-    const groceries = await prisma.expense.upsert({
-      where: { description: 'Groceries - shared' },
-      update: {},
-      create: {
-        description: 'Groceries - shared',
-        amount: '120.00',
-        groupId: roommates.id,
-        recordedById: alice.id,
-        paidById: bob.id,
-        splits: {
-          create: [
-            { user: { connect: { id: alice.id } }, amountOwed: '40.00' },
-            { user: { connect: { id: bob.id } }, amountOwed: '40.00' },
-            { user: { connect: { id: carol.id } }, amountOwed: '40.00' },
-          ],
-        },
-      },
-    });
-
-    // Another expense where one person paid for dinner
-    const dinner = await prisma.expense.upsert({
-      where: { description: 'Dinner out' },
-      update: {},
-      create: {
-        description: 'Dinner out',
-        amount: '75.00',
-        groupId: roommates.id,
-        recordedById: carol.id,
-        paidById: alice.id,
-        splits: {
-          create: [
-            { user: { connect: { id: alice.id } }, amountOwed: '25.00' },
-            { user: { connect: { id: bob.id } }, amountOwed: '25.00' },
-            { user: { connect: { id: carol.id } }, amountOwed: '25.00' },
-          ],
-        },
-      },
-    });
-
-    console.log('Inserted expenses:', groceries.description, dinner.description);
-  } catch (err) {
-    console.error('Error seeding users/groups/expenses:', err);
-    throw err;
+    // Run the two main steps sequentially
+    await clearDatabase();
+    await seedData();
+  } catch (e) {
+    console.error("Seed Error:", e);
+    process.exit(1);
+  } finally {
+    // Ensure the client disconnects after operation
+    await prisma.$disconnect();
   }
 }
 
-main()
-  .catch((e) => {
-    console.error('Seed failed:', e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    try {
-      await prisma.$disconnect();
-    } catch (e) {
-      console.error('Error disconnecting prisma:', e);
-    }
-    try {
-      await pool.end();
-    } catch (e) {
-      console.error('Error closing pg pool:', e);
-    }
-  });
+main();

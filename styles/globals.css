@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* --- 1. CSS Variable Definitions --- */
+:root {
+  --background: #e6e6e6;
+  --foreground: #222121;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #222121;
+    --foreground: #e6e6e6;
+  }
+}
+
+/* --- 2. Mobile-First Base Styles --- */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  padding-top: 90px; /* Example: Ensure content is below a fixed mobile header */
+}
+
+.nav {
+  /* Mobile-first: Dark background, light text */
+  background: var(--foreground);
+  color: var(--background);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  button {
+    background: var(--background);
+    color: var(--foreground);
+    padding: 8px;
+    border-radius: var(--radius-lg);
+    display: inline-flex;
+    align-items: center;
+    --tw-duration: 150ms;
+    transition-duration: 150ms;
+    font-weight: bold;
+  }
+  
+  @property --tw-duration {
+    syntax: "*";
+    inherits: false;
+  }
+  
+  button:hover {
+    background: #c4c2c2;
+    color: var(--foreground);
+    cursor: pointer;
+  }
+}
+
+header #logo {
+  cursor: pointer;
+}
+
+
+  button {
+    background: var(--foreground );
+    color: var(--background);
+    padding: 8px;
+    border-radius: var(--radius-lg);
+    display: inline-flex;
+    align-items: center;
+    --tw-duration: 150ms;
+    transition-duration: 150ms;
+    font-weight:400 ;
+  }
+  
+  @property --tw-duration {
+    syntax: "*";
+    inherits: false;
+  }
+  
+  button:hover {
+    background: #c4c2c2;
+    color: var(--foreground);
+    cursor: pointer;
+  }
+
+/* --- 3. Desktop/Tablet Styles  --- */
+@media (min-width: 768px) {
+  body {
+    padding-top: 100px;
+  }
+
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+  }
+
+  header button {
+    padding: 10px 15px;
+  }
+}

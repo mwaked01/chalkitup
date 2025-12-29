@@ -1,18 +1,24 @@
-import { PrismaClient } from '../generated/client/client.ts';
+import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
 const connectionString = process.env.DATABASE_URL;
 
+// 1. Create a Postgres Pool
 const pool = new Pool({ connectionString });
+
+// 2. Create the Driver Adapter
 const adapter = new PrismaPg(pool);
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+// 3. Instantiate Prisma Client with the adapter
+const prismaClientSingleton = () => {
+  return new PrismaClient({ adapter });
+};
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({ 
-    adapter 
-  });
+declare global {
+  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const prisma = globalThis.prisma ?? prismaClientSingleton();
+
+if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
